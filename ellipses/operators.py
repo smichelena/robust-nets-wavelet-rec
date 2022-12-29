@@ -16,7 +16,7 @@ from fastmri_utils.data.transforms import fftshift, ifftshift
 
 
 class RadialMaskFunc(object):
-    """ Generates a golden angle radial spokes mask.
+    """Generates a golden angle radial spokes mask.
 
     Useful for subsampling a Fast-Fourier-Transform.
     Contains radial lines (spokes) through the center of the mask, with
@@ -75,7 +75,7 @@ class RadialMaskFunc(object):
 
 
 def l2_error(X, X_ref, relative=False, squared=False, use_magnitude=True):
-    """ Compute average l2-error of an image over last three dimensions.
+    """Compute average l2-error of an image over last three dimensions.
 
     Parameters
     ----------
@@ -127,7 +127,7 @@ def l2_error(X, X_ref, relative=False, squared=False, use_magnitude=True):
 
 
 def l2_error_meas(X, X_ref, relative=False, squared=False):
-    """ Compute average l2-error of measurements over last two dimensions.
+    """Compute average l2-error of measurements over last two dimensions.
 
     Parameters
     ----------
@@ -175,7 +175,7 @@ def l2_error_meas(X, X_ref, relative=False, squared=False):
 
 
 def noise_gaussian(y, eta, n_seed=None, t_seed=None):
-    """ Additive Gaussian noise. """
+    """Additive Gaussian noise."""
     if n_seed is not None:
         np.random.seed(n_seed)
     if t_seed is not None:
@@ -186,18 +186,18 @@ def noise_gaussian(y, eta, n_seed=None, t_seed=None):
 
 
 def noise_poisson(y, eta, n_seed=None, t_seed=None):
-    """ Rescaled Poisson noise. (not additive!) """
+    """Rescaled Poisson noise. (not additive!)"""
     if n_seed is not None:
         np.random.seed(n_seed)
     if t_seed is not None:
         torch.manual_seed(t_seed)
-    scale_fac = y.sum(dim=-1, keepdim=True) / (eta ** 2)
+    scale_fac = y.sum(dim=-1, keepdim=True) / (eta**2)
     noisy_y = torch.poisson(scale_fac * y) / scale_fac
     return noisy_y
 
 
 def to_complex(x):
-    """ Converts real images to complex by adding a channel dimension. """
+    """Converts real images to complex by adding a channel dimension."""
     assert x.ndim >= 3 and (x.shape[-3] == 1 or x.shape[-3] == 2)
     # real tensor of shape (1, n1, n2) or batch of shape (*, 1, n1, n2)
     if x.shape[-3] == 1:
@@ -209,7 +209,7 @@ def to_complex(x):
 
 
 def rotate_real(x):
-    """ Rotates the magnitude of a complex signal into the real channel. """
+    """Rotates the magnitude of a complex signal into the real channel."""
     assert x.ndim >= 3 and (x.shape[-3] == 2)
     x_rv = torch.zeros_like(x)
     x_rv[..., 0, :, :] = torch.sqrt(x.pow(2).sum(-3))
@@ -217,14 +217,14 @@ def rotate_real(x):
 
 
 def mult_complex(x, y):
-    """ Multiply two complex tensors with real and imag in last dimension. """
+    """Multiply two complex tensors with real and imag in last dimension."""
     out_real = x[..., 0] * y[..., 0] - x[..., 1] * y[..., 1]
     out_imag = x[..., 0] * y[..., 1] + x[..., 1] * y[..., 0]
     return torch.stack([out_real, out_imag], dim=-1)
 
 
 def div_complex(x, y):
-    """ Divide two complex tensors with real and imag in last dimension. """
+    """Divide two complex tensors with real and imag in last dimension."""
     out_real = x[..., 0] * y[..., 0] + x[..., 1] * y[..., 1]
     out_imag = x[..., 1] * y[..., 0] - x[..., 0] * y[..., 1]
     denom = y[..., 0].pow(2) + y[..., 1].pow(2)
@@ -232,30 +232,30 @@ def div_complex(x, y):
 
 
 def conj_complex(x):
-    """ Complex conjugate of tensor with real and imag in last dimension. """
+    """Complex conjugate of tensor with real and imag in last dimension."""
     out_real = x[..., 0]
     out_imag = -x[..., 1]
     return torch.stack([out_real, out_imag], dim=-1)
 
 
 def im2vec(x, dims=(-2, -1)):
-    """ Flattens last two dimensions of an image tensor to a vector. """
+    """Flattens last two dimensions of an image tensor to a vector."""
     return torch.flatten(x, *dims)
 
 
 def vec2im(x, n):
-    """ Unflattens the last dimension of a vector to two image dimensions. """
+    """Unflattens the last dimension of a vector to two image dimensions."""
     return x.view(*x.shape[:-1], *n)
 
 
 def prep_fft_channel(x):
-    """ Rotates complex image dimension from channel to last position. """
+    """Rotates complex image dimension from channel to last position."""
     x = torch.reshape(x, x.shape[:-3] + (x.shape[-3] // 2, 2) + x.shape[-2:])
     return x.permute(*range(x.ndim - 3), -2, -1, -3)
 
 
 def unprep_fft_channel(x):
-    """ Rotates complex image dimension from last to channel position. """
+    """Rotates complex image dimension from last to channel position."""
     x = x.permute(*range(x.ndim - 3), -1, -3, -2)
     return torch.reshape(
         x, x.shape[:-4] + (x.shape[-4] * x.shape[-3],) + x.shape[-2:]
@@ -263,7 +263,7 @@ def unprep_fft_channel(x):
 
 
 def circshift(x, dim=-1, num=1):
-    """ Circular shift by n along a dimension. """
+    """Circular shift by n along a dimension."""
     perm = list(range(num, x.shape[dim])) + list(range(0, num))
     if not dim == -1:
         return x.transpose(dim, -1)[..., perm].transpose(dim, -1)
@@ -275,12 +275,12 @@ def circshift(x, dim=-1, num=1):
 
 
 def _shrink_single(x, thresh):
-    """ Soft/Shrinkage thresholding for tensors. """
+    """Soft/Shrinkage thresholding for tensors."""
     return torch.nn.Softshrink(thresh)(x)
 
 
 def _shrink_recursive(c, thresh):
-    """ Soft/Shrinkage thresholding for nested tuples/lists of tensors. """
+    """Soft/Shrinkage thresholding for nested tuples/lists of tensors."""
     if isinstance(c, (list, tuple)):
         return [_shrink_recursive(el, thresh) for el in c]
     else:
@@ -291,7 +291,7 @@ shrink = _shrink_single  # alias for convenience
 
 
 def proj_l2_ball(x, centre, radius):
-    """ Euclidean projection onto a closed l2-ball.
+    """Euclidean projection onto a closed l2-ball.
 
     Parameters
     ----------
@@ -318,7 +318,7 @@ def proj_l2_ball(x, centre, radius):
 
 
 class LinearOperator(ABC):
-    """ Abstract base class for linear (measurement) operators.
+    """Abstract base class for linear (measurement) operators.
 
     Can be used for real operators
 
@@ -347,7 +347,7 @@ class LinearOperator(ABC):
 
     @abstractmethod
     def dot(self, x):
-        """ Application of the operator to a vector.
+        """Application of the operator to a vector.
 
         Computes Ax for a given vector x from the domain.
 
@@ -364,7 +364,7 @@ class LinearOperator(ABC):
 
     @abstractmethod
     def adj(self, y):
-        """ Application of the adjoint operator to a vector.
+        """Application of the adjoint operator to a vector.
 
         Computes (A^*)y for a given vector y from the co-domain.
 
@@ -382,7 +382,7 @@ class LinearOperator(ABC):
 
     @abstractmethod
     def inv(self, y):
-        """ Application of some inversion of the operator to a vector.
+        """Application of some inversion of the operator to a vector.
 
         Computes (A^dagger)y for a given vector y from the co-domain.
         A^dagger can for example be the pseudo-inverse.
@@ -407,7 +407,7 @@ class LinearOperator(ABC):
 
 
 class Fourier(LinearOperator):
-    """ 2D discrete Fourier transform.
+    """2D discrete Fourier transform.
 
     Implements the complex operator C^(n1, n2) -> C^m
     appling the (subsampled) Fourier transform.
@@ -428,12 +428,12 @@ class Fourier(LinearOperator):
         self.mask = mask[0, 0, :, :].bool()
 
     def dot(self, x):
-        """ Subsampled Fourier transform. """
+        """Subsampled Fourier transform."""
         full_fft = unprep_fft_channel(transforms.fft2(prep_fft_channel(x)))
         return im2vec(full_fft)[..., im2vec(self.mask)]
 
     def adj(self, y):
-        """ Adjoint is the zeor-filled inverse Fourier transform. """
+        """Adjoint is the zero-filled inverse Fourier transform."""
         masked_fft = torch.zeros(
             *y.shape[:-1], self.n[0] * self.n[1], device=y.device
         )
@@ -443,11 +443,11 @@ class Fourier(LinearOperator):
         )
 
     def inv(self, y):
-        """ Pseudo-inverse a.k.a. zero-filled IFFT. """
+        """Pseudo-inverse a.k.a. zero-filled IFFT."""
         return self.adj(y)
 
     def tikh(self, rhs, kernel, rho):
-        """ Tikhonov regularized inversion.
+        """Tikhonov regularized inversion.
 
         Solves the normal equation
 
@@ -484,7 +484,7 @@ class Fourier(LinearOperator):
 
 
 class Fourier_matrix(LinearOperator, torch.nn.Module):
-    """ 2D discrete Fourier transform based on Kroneckers of 1D Fourier.
+    """2D discrete Fourier transform based on Kroneckers of 1D Fourier.
 
     Implements the complex operator C^(n1, n2) -> C^m appling the (subsampled)
     Fourier transform. The adjoint is the conjugate transpose. The inverse is
@@ -511,12 +511,12 @@ class Fourier_matrix(LinearOperator, torch.nn.Module):
         self.ifft2 = LearnableFourier2D(n, inverse=True, learnable=False)
 
     def dot(self, x):
-        """ Subsampled Fourier transform. """
+        """Subsampled Fourier transform."""
         full_fft = self.fft2(x)
         return im2vec(full_fft)[..., im2vec(self.mask)]
 
     def adj(self, y):
-        """ Adjoint is the zeor-filled inverse Fourier transform. """
+        """Adjoint is the zeor-filled inverse Fourier transform."""
         masked_fft = torch.zeros(
             *y.shape[:-1], self.n[0] * self.n[1], device=y.device
         )
@@ -524,11 +524,11 @@ class Fourier_matrix(LinearOperator, torch.nn.Module):
         return self.ifft2(vec2im(masked_fft, self.n))
 
     def inv(self, y):
-        """ Pseudo-inverse a.k.a. zero-filled IFFT. """
+        """Pseudo-inverse a.k.a. zero-filled IFFT."""
         return self.adj(y)
 
     def tikh(self, rhs, kernel, rho):
-        """ Tikhonov regularized inversion.
+        """Tikhonov regularized inversion.
 
         Solves the normal equation
 
@@ -565,7 +565,7 @@ class Fourier_matrix(LinearOperator, torch.nn.Module):
 
 
 class Radon(LinearOperator):
-    """ 2D parallel beam Radon transform based on FFTs.
+    """2D parallel beam Radon transform based on FFTs.
 
     Implements the real operator R^(n1, n2) -> R^m
     appling the (subsampled) parallel beam Radon transform.
@@ -631,7 +631,7 @@ class Radon(LinearOperator):
 
 
 class TVAnalysisPeriodic(LinearOperator):
-    """ 2D Total Variation analysis operator.
+    """2D Total Variation analysis operator.
     Implements the real operator R^(n1, n2) -> R^(2*n1*n2)
     appling the forward finite difference operator
 
@@ -660,7 +660,10 @@ class TVAnalysisPeriodic(LinearOperator):
     def dot(self, x):
         row_diff = circshift(x, dim=-2) - x
         col_diff = circshift(x, dim=-1) - x
-        return torch.cat([im2vec(row_diff), im2vec(col_diff)], dim=-1,)
+        return torch.cat(
+            [im2vec(row_diff), im2vec(col_diff)],
+            dim=-1,
+        )
 
     def adj(self, y):
         row_diff = vec2im(
@@ -677,7 +680,7 @@ class TVAnalysisPeriodic(LinearOperator):
         )
 
     def get_fourier_kernel(self):
-        """ The factors of the operator after diagonalization by 2D FFTs. """
+        """The factors of the operator after diagonalization by 2D FFTs."""
         kernel = torch.zeros(self.n[0], self.n[1]).unsqueeze(-3)
         kernel[0, 0, 0] = 4
         kernel[0, 0, 1] = -1
@@ -697,7 +700,7 @@ class TVAnalysisPeriodic(LinearOperator):
 
 
 class LearnableFourier1D(torch.nn.Module):
-    """ Learnable 1D discrete Fourier transform.
+    """Learnable 1D discrete Fourier transform.
 
     Implements a complex operator C^n -> C^n, which is learnable but
     initialized as the Fourier transform.
@@ -770,7 +773,7 @@ class LearnableFourier1D(torch.nn.Module):
 
 
 class LearnableFourier2D(torch.nn.Module):
-    """ Learnable 2D discrete Fourier transform.
+    """Learnable 2D discrete Fourier transform.
 
     Implements a complex operator C^(n1, n2) -> C^(n1, n2), which is learnable
     but initialized as the Fourier transform. Operates along the last two
@@ -804,7 +807,7 @@ class LearnableFourier2D(torch.nn.Module):
 
 
 class LearnableInverter(torch.nn.Module):
-    """ Learnable inversion of subsampled discrete Fourier transform.
+    """Learnable inversion of subsampled discrete Fourier transform.
 
     The zero-filling (transpose of the subsampling operator) is fixed.
     The inversion is learnable and initialized as a 2D inverse Fourier
@@ -838,11 +841,169 @@ class LearnableInverter(torch.nn.Module):
         return self.learnable_ifft(vec2im(masked_fft, self.n))
 
 
+# Wavelet methods
+
+import pywt
+from pytorch_wavelets import DWT, IDWT
+
+
+def to_pywt(ll, lh):
+    """Pytorch wavelets output format to PyWavelets output format.
+
+    This exists because PyWavelets allows me to take an output array and reaarrange it into a 2D image array
+
+    Parameters
+    ----------
+    ll, lh: Wavelet coeffcient tensors in format returned by pytorch_wavelets
+
+    Output
+    ------
+    Wavelet coefficients in format as returned by PyWavelets, that is a list:
+    [cAn, (cHn, cVn, cDn), … (cH1, cV1, cD1)]
+    of numpy arrays
+    """
+    ll = torch.squeeze(ll)
+    out = []
+    out.append(ll.cpu().detach().numpy())
+
+    for tensor in reversed(lh):
+        a, b, c = torch.unbind(tensor, dim=2)
+        a = torch.squeeze(a)
+        b = torch.squeeze(b)
+        c = torch.squeeze(c)
+        out.append(
+            (
+                c.cpu().detach().numpy(),
+                b.cpu().detach().numpy(),
+                a.cpu().detach().numpy(),
+            )
+        )
+    return out
+
+
+def wavelet_process_image(x, wavelet, device):
+    """Computes wavelet transform of a single image
+    
+    Note: Current implementation can only handle grayscale images
+    """
+    x = x.unsqueeze(0)
+    yl, yh = wavelet(x.to(device))
+    inPywt = to_pywt(yl, yh)
+    arr, _ = pywt.coeffs_to_array(inPywt, axes=(-2, -1))
+    return torch.from_numpy(arr).to(device)
+
+
+# for shapes debugging
+def print_out_list(list):
+    for l in list:
+        print(l.shape)
+    print("length of list", len(list))
+
+
+def wavelet_process_batch(x, wavelet, device):
+    """Computes wavelet transform over a batch of images"""
+    # YL, YH = wavelet(x.to(device)) #the output format of this is unworkable
+    x = torch.unbind(x.to(device), dim=0)
+    output = []
+    for t in x:
+        output.append(wavelet_process_image(t, wavelet, device))
+    return torch.stack(output, dim=0)
+
+
+def get_slices(n, wavelet, device):
+    """Gets slices dictionary needed for going from 2D array to coefficients
+    
+    Also returns image output shape, note that m = out_shape[0]*out_shape[1]
+    """
+    dummy = torch.zeros(n).to(device)
+    dummy = dummy.unsqueeze(0).unsqueeze(0)
+    yl, yh = wavelet(dummy)
+    dummyInPywt = to_pywt(yl, yh)
+    arr, slices = pywt.coeffs_to_array(dummyInPywt, axes=(-2, -1))
+    return slices, arr.shape
+
+
+def inverse_process_image(y, slices, device):
+    y = y.cpu().detach().numpy()
+    coeff_arr = pywt.array_to_coeffs(y, slices, output_format="wavedec2")
+    arr = pywt.waverec2(coeff_arr, "db4", mode="zero", axes=(-2, -1))
+    return torch.from_numpy(arr).to(device)
+
+
+def inverse_process_batch(y, slices, device):
+    listified = torch.unbind(y, dim=0)
+    output = []
+    for t in listified:
+        tProcessed = inverse_process_image(t, slices, device)
+        output.append(tProcessed)
+    return torch.stack(output, dim=0)
+
+
+class Wavelet(LinearOperator):
+    """2D discrete wavelet transform, uses a Daubechies wavelet.
+
+    Implements the real operator R^(n1, n2) -> R^(m)
+    applying the discrete wavelet transform with a Daubechies (orthogonal) wavelet.
+    Note: zero extension boundary conditions are used, this guarantees the adjoint is the inverse.
+
+
+    Returns
+    ----------
+        An image vectorized into a size m vector that corresponds to the
+        wavelet decomposition of the image.
+        m depends on n1, n2 and also on the padding, since this changes depending on
+        the input image size (and the amount of taps used for the wavelet FIR filters) 
+        we provide an out_shape attribute along with its getter
+    """
+
+    def __init__(self, n, device, level):
+        self.in_shape = n
+        self.device = device
+        self.level = level
+        self.wavelet = DWT(J=level, mode="zero", wave="db4").to(device)
+        # self.iwavelet = IDWT(mode='zero', wave='db4').to(device)
+        self.slices, self.out_shape = get_slices(
+            self.in_shape, self.wavelet, self.device
+        )
+        super().__init__(n[0] * n[1], n)
+
+    def dot(self, x):
+        if x.ndim == 3:  # no batch dimension
+            x = wavelet_process_image(x, self.wavelet, self.device)
+            return im2vec(x)
+        else:
+            x = wavelet_process_batch(x, self.wavelet, self.device)
+            return im2vec(x)
+
+    def adj(self, y):
+        if y.ndim == 1:
+            y = vec2im(y, self.out_shape)
+            return inverse_process_image(y, self.slices, self.device)
+        else:
+            y = vec2im(y, self.out_shape)
+            return inverse_process_batch(y, self.slices, self.device)
+
+    def inv(self, y):
+        raise NotImplementedError(
+            "This operator does not implement a direct " "inversion."
+        )
+
+    # some getters and setters for testing/troubleshooting
+    def get_in_shape(self):
+        return self.in_shape
+
+    def get_out_shape(self):
+        return self.out_shape
+
+    def get_slices(self):
+        return self.slices
+
+
 # ----- Inversion Methods -----
 
 
 class CGInverterLayer(torch.nn.Module):
-    """ Solves a batch of positive definite linear systems using the PCG.
+    """Solves a batch of positive definite linear systems using the PCG.
 
     This class is a wrapper of `torch_cg.CG` making it compatible with our
     input signal specifications for 2D image signals.
@@ -881,13 +1042,13 @@ class CGInverterLayer(torch.nn.Module):
         super().__init__()
 
         def _A_bmm(X):
-            """ Shape compatible wrapper for A_bmm. """
+            """Shape compatible wrapper for A_bmm."""
             AX = A_bmm(X.view((-1,) + shape))
             AX_flat = torch.flatten(AX, -3, -1).unsqueeze(-1)
             return AX_flat
 
         def _M_bmm(X):
-            """ Shape compatible wrapper for M_bmm. """
+            """Shape compatible wrapper for M_bmm."""
             MX = M_bmm(X.view((-1,) + shape))
             MX_flat = torch.flatten(MX, -3, -1).unsqueeze(-1)
             return MX_flat
@@ -898,7 +1059,7 @@ class CGInverterLayer(torch.nn.Module):
         self.func = _CGInverterFunc(self.A_bmm, self.M_bmm, **kwargs)
 
     def forward(self, B, X0=None):
-        """ Solves the linear system given a right hand side.
+        """Solves the linear system given a right hand side.
 
         Parameters
         ----------
@@ -918,10 +1079,10 @@ class CGInverterLayer(torch.nn.Module):
 def _CGInverterFunc(
     A_bmm, M_bmm, rtol=1e-5, atol=0.0, maxiter=None, verbose=False
 ):
-    """ Helper function for building CGInverter autograd functions. """
+    """Helper function for building CGInverter autograd functions."""
 
     class _CGInverter(torch.autograd.Function):
-        """ The actual CGInverter autograd function. """
+        """The actual CGInverter autograd function."""
 
         @staticmethod
         def forward(ctx, *params):

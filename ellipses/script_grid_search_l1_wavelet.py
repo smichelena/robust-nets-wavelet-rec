@@ -12,8 +12,9 @@ from operators import (
     noise_gaussian,
     to_complex,
     unprep_fft_channel,
+    Wavelet
 )
-from reconstruction_methods import admm_l1_rec_diag, grid_search
+from reconstruction_methods import admm_l1_rec, grid_search
 
 
 # ----- load configuration -----
@@ -29,7 +30,7 @@ save_path = os.path.join(config.RESULTS_PATH, "grid_search_l1")
 mask_func = RadialMaskFunc(config.n, 40)
 mask = unprep_fft_channel(mask_func((1, 1) + config.n + (1,)))
 OpA = Fourier(mask)
-OpTV = TVAnalysisPeriodic(config.n, device=device)
+OpW = Wavelet(config.n, device=device)
 
 # ----- load test data --------
 samples = range(50, 100)
@@ -62,12 +63,12 @@ def meas_noise(y, noise_level):
 
 
 def _reconstruct(y, lam, rho):
-    x, _ = admm_l1_rec_diag(
+    x, _ = admm_l1_rec(
         y,
         OpA,
-        OpTV,
+        OpW,
         OpA.adj(y),
-        OpTV(OpA.adj(y)),
+        OpW(OpA.adj(y)),
         lam,
         rho,
         iter=1000,
@@ -119,12 +120,6 @@ if __name__ == "__main__":
         results = pd.DataFrame(
             columns=["noise_rel", "grid_param", "err_min", "grid", "err"]
         )
-
-        #print("noise rel", noise_rel[idx])
-        #print("grid_param", grid_param)
-        #print("err_min:", err_min)
-        #print("grid:", grid)
-        #print("err:", err)
 
         results.loc[idx] = {
             "noise_rel": noise_rel[idx].cpu().detach().numpy(),

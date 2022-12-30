@@ -844,99 +844,88 @@ class LearnableInverter(torch.nn.Module):
 # Wavelet methods
 
 import pywt
-from pytorch_wavelets import DWT, IDWT
 
 
-def to_pywt(ll, lh):
-    """Pytorch wavelets output format to PyWavelets output format.
+def get_slices(n, wavelet):
+    """Gets slices dictionary needed for going from 2D array to coefficients
 
-    This exists because PyWavelets allows me to take an output array and reaarrange it into a 2D image array
-
-    Parameters
-    ----------
-    ll, lh: Wavelet coeffcient tensors in format returned by pytorch_wavelets
-
-    Output
-    ------
-    Wavelet coefficients in format as returned by PyWavelets, that is a list:
-    [cAn, (cHn, cVn, cDn), … (cH1, cV1, cD1)]
-    of numpy arrays
+    Also returns image output shape, note that m = out_shape[0]*out_shape[1]
     """
-    ll = torch.squeeze(ll)
-    out = []
-    out.append(ll.cpu().detach().numpy())
-
-    for tensor in reversed(lh):
-        a, b, c = torch.unbind(tensor, dim=2)
-        a = torch.squeeze(a)
-        b = torch.squeeze(b)
-        c = torch.squeeze(c)
-        out.append(
-            (
-                c.cpu().detach().numpy(),
-                b.cpu().detach().numpy(),
-                a.cpu().detach().numpy(),
-            )
-        )
-    return out
+    dummy = np.zeros(n)
+    dummyW = wavelet(dummy)
+    arr, slices = pywt.coeffs_to_array(dummyW, axes=(-2, -1))
+    return slices, arr.shape
 
 
 def wavelet_process_image(x, wavelet, device):
     """Computes wavelet transform of a single image
-    
+
     Note: Current implementation can only handle grayscale images
     """
-    x = x.unsqueeze(0)
-    yl, yh = wavelet(x.to(device))
-    inPywt = to_pywt(yl, yh)
-    arr, _ = pywt.coeffs_to_array(inPywt, axes=(-2, -1))
+    y = wavelet(x)
+    arr, _ = pywt.coeffs_to_array(y, axes=(-2, -1))
     return torch.from_numpy(arr).to(device)
 
 
-# for shapes debugging
-def print_out_list(list):
-    for l in list:
-        print(l.shape)
-    print("length of list", len(list))
-
-
-def wavelet_process_batch(x, wavelet, device):
-    """Computes wavelet transform over a batch of images"""
-    # YL, YH = wavelet(x.to(device)) #the output format of this is unworkable
-    x = torch.unbind(x.to(device), dim=0)
+def wavelet_process_real_batch(x, wavelet, device):
+    """Computes wavelet transform over a batch of real images"""
+    x = x.detach().cpu().numpy()
+    # x = x.astype(float)
+    x = x.tolist()
     output = []
     for t in x:
         output.append(wavelet_process_image(t, wavelet, device))
     return torch.stack(output, dim=0)
 
 
-def get_slices(n, wavelet, device):
-    """Gets slices dictionary needed for going from 2D array to coefficients
-    
-    Also returns image output shape, note that m = out_shape[0]*out_shape[1]
-    """
-    dummy = torch.zeros(n).to(device)
-    dummy = dummy.unsqueeze(0).unsqueeze(0)
-    yl, yh = wavelet(dummy)
-    dummyInPywt = to_pywt(yl, yh)
-    arr, slices = pywt.coeffs_to_array(dummyInPywt, axes=(-2, -1))
-    return slices, arr.shape
+def wavelet_process_batch(x, wavelet, device):
+    """Computes wavelet transform over a batch of possibly complex images"""
+    if x.shape[1] == 1:
+        return wavelet_process_real_batch(x, wavelet, device)
+    else:
+        x = torch.unbind(x, dim=1)
+        output = []
+        for t in x:
+            output.append(wavelet_process_real_batch(t, wavelet, device))
+    return torch.stack(
+        output,
+        dim=1,
+    )
 
 
-def inverse_process_image(y, slices, device):
-    y = y.cpu().detach().numpy()
+def inverse_process_image(y, iwavelet, slices, device):
+    """Given inverse wavelet transform over an image"""
     coeff_arr = pywt.array_to_coeffs(y, slices, output_format="wavedec2")
-    arr = pywt.waverec2(coeff_arr, "db4", mode="zero", axes=(-2, -1))
-    return torch.from_numpy(arr).to(device)
+    x = iwavelet(coeff_arr)
+    return torch.from_numpy(x).to(device)
 
 
-def inverse_process_batch(y, slices, device):
-    listified = torch.unbind(y, dim=0)
+def inverse_process_real_batch(y, iwavelet, slices, device):
+    """Given inverse wavelet transform over a batch of images"""
+    y = y.squeeze(1)
+    y = y.detach().cpu().numpy()
+    # y = y.astype(float)
+    y = y.tolist()
     output = []
-    for t in listified:
-        tProcessed = inverse_process_image(t, slices, device)
-        output.append(tProcessed)
+    for t in y:
+        output.append(inverse_process_image(t, iwavelet, slices, device))
     return torch.stack(output, dim=0)
+
+
+def inverse_process_batch(y, iwavelet, slices, device):
+    if y.shape[1] == 1:
+        return inverse_process_real_batch(y, iwavelet, slices, device)
+    else:
+        y = torch.unbind(y, dim=1)
+        output = []
+        for t in y:
+            output.append(
+                inverse_process_real_batch(t, iwavelet, slices, device)
+            )
+    return torch.stack(
+        output,
+        dim=1,
+    )
 
 
 class Wavelet(LinearOperator):
@@ -946,13 +935,15 @@ class Wavelet(LinearOperator):
     applying the discrete wavelet transform with a Daubechies (orthogonal) wavelet.
     Note: zero extension boundary conditions are used, this guarantees the adjoint is the inverse.
 
+    Can also be applied to complex tensors with shape (2, n1, n2).
+    It will then act upon the real part and imaginary part separately.
 
     Returns
     ----------
         An image vectorized into a size m vector that corresponds to the
         wavelet decomposition of the image.
         m depends on n1, n2 and also on the padding, since this changes depending on
-        the input image size (and the amount of taps used for the wavelet FIR filters) 
+        the input image size (and the amount of taps used for the wavelet FIR filters)
         we provide an out_shape attribute along with its getter
     """
 
@@ -960,28 +951,44 @@ class Wavelet(LinearOperator):
         self.in_shape = n
         self.device = device
         self.level = level
-        self.wavelet = DWT(J=level, mode="zero", wave="db4").to(device)
-        # self.iwavelet = IDWT(mode='zero', wave='db4').to(device)
-        self.slices, self.out_shape = get_slices(
-            self.in_shape, self.wavelet, self.device
+        self.wavelet = lambda x: pywt.wavedec2(
+            x, wavelet="db4", mode="zero", level=self.level, axes=(-2, -1)
         )
-        super().__init__(n[0] * n[1], n)
+        self.iwavelet = lambda x: pywt.waverec2(
+            x, wavelet="db4", mode="zero", axes=(-2, -1)
+        )
+        self.slices, self.out_shape = get_slices(self.in_shape, self.wavelet)
+        super().__init__(self.out_shape[0] * self.out_shape[1], n)
 
     def dot(self, x):
         if x.ndim == 3:  # no batch dimension
             x = wavelet_process_image(x, self.wavelet, self.device)
-            return im2vec(x)
+            return im2vec(x).type(torch.FloatTensor).to(self.device)
         else:
             x = wavelet_process_batch(x, self.wavelet, self.device)
-            return im2vec(x)
+            return im2vec(x).type(torch.FloatTensor).to(self.device)
 
     def adj(self, y):
-        if y.ndim == 1:
+        if y.ndim == 2:
             y = vec2im(y, self.out_shape)
-            return inverse_process_image(y, self.slices, self.device)
+            y = y.squeeze(0)
+            y = y.cpu().detach().numpy()
+            return (
+                inverse_process_image(
+                    y, self.iwavelet, self.slices, self.device
+                )
+                .type(torch.FloatTensor)
+                .to(self.device)
+            )
         else:
             y = vec2im(y, self.out_shape)
-            return inverse_process_batch(y, self.slices, self.device)
+            return (
+                inverse_process_batch(
+                    y, self.iwavelet, self.slices, self.device
+                )
+                .type(torch.FloatTensor)
+                .to(self.device)
+            )
 
     def inv(self, y):
         raise NotImplementedError(

@@ -12,7 +12,7 @@ from operators import (
     noise_gaussian,
     to_complex,
     unprep_fft_channel,
-    Wavelet
+    Wavelet,
 )
 from reconstruction_methods import admm_l1_rec, grid_search
 
@@ -30,7 +30,7 @@ save_path = os.path.join(config.RESULTS_PATH, "grid_search_l1")
 mask_func = RadialMaskFunc(config.n, 40)
 mask = unprep_fft_channel(mask_func((1, 1) + config.n + (1,)))
 OpA = Fourier(mask)
-OpW = Wavelet(config.n, device=device)
+OpW = Wavelet(config.n, device=device, level=4)
 
 # ----- load test data --------
 samples = range(50, 100)
@@ -41,7 +41,7 @@ X_0 = to_complex(X_0.to(device))
 # ----- noise setup --------
 noise_min = 1e-3
 noise_max = 0.08
-noise_steps = 2 #original is 50, I dont have the computer power
+noise_steps = 2  # original is 50, I dont have the computer power
 noise_rel = torch.tensor(
     np.logspace(np.log10(noise_min), np.log10(noise_max), num=noise_steps)
 ).float()
@@ -67,18 +67,18 @@ def _reconstruct(y, lam, rho):
         y,
         OpA,
         OpW,
-        OpA.adj(y),
-        OpW(OpA.adj(y)),
+        OpA.adj(y),  # complex
+        OpW.dot(OpA.adj(y)),  # complex
         lam,
         rho,
-        iter=1000,
-        silent=True,
+        iter=10,
+        silent=False,
     )
     return x
 
 
 # parameter search grid
-grid_size = 2 #original is 25, I dont have the computing power
+grid_size = 2  # original is 25, I dont have the computing power
 grid = {
     "lam": np.logspace(-6, -1, grid_size),
     "rho": np.logspace(-5, 1, grid_size),
@@ -105,7 +105,7 @@ def combine_results():
 
 if __name__ == "__main__":
 
-    #idx_noise = (int(os.environ.get("SGE_TASK_ID")) - 1,) this is for the Sun Grid Engine thing
+    # idx_noise = (int(os.environ.get("SGE_TASK_ID")) - 1,) this is for the Sun Grid Engine thing
 
     for idx in range(len(noise_rel)):
 
@@ -113,7 +113,9 @@ if __name__ == "__main__":
             p=2, dim=(-2, -1), keepdim=True
         )
 
-        Y_ref = meas_noise(OpA(X_0), noise_level)
+        Y_ref = meas_noise(
+            OpA(X_0), noise_level
+        )  # this is a complex valued array
 
         grid_param, err_min, err = grid_search(X_0, Y_ref, _reconstruct, grid)
 
@@ -130,7 +132,7 @@ if __name__ == "__main__":
         }
 
         os.makedirs(save_path, exist_ok=True)
-        
+
         results.to_pickle(
             os.path.join(save_path, file_name + str(idx) + ".pkl")
         )

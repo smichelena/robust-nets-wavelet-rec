@@ -4,6 +4,8 @@ import matplotlib as mpl
 import torch
 import torchvision
 
+torch.cuda.empty_cache()
+
 from data_management import IPDataset, Jitter, SimulateMeasurements, ToComplex
 from networks import IterativeNet, Tiramisu
 from operators import (
@@ -67,8 +69,8 @@ def loss_func(pred, tar):
 
 train_phases = 2
 train_params = {
-    "num_epochs": [50, 10],
-    "batch_size": [8, 5],
+    "num_epochs": [5, 5], #original = [50, 10]
+    "batch_size": [2, 2], #original = [8, 5]
     "loss_func": loss_func,
     "save_path": [
         os.path.join(
@@ -86,7 +88,7 @@ train_params = {
     ],
     "scheduler": torch.optim.lr_scheduler.StepLR,
     "scheduler_params": {"step_size": 1, "gamma": 1.0},
-    "acc_steps": [1, 200],
+    "acc_steps": [1, 10], #original = [1, 200]
     "train_transform": torchvision.transforms.Compose(
         [ToComplex(), SimulateMeasurements(OpA), Jitter(1e1, 0.0, 1.0)]
     ),

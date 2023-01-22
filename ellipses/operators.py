@@ -929,7 +929,7 @@ def inverse_process_batch(y, iwavelet, slices, device):
 
 
 class Wavelet(LinearOperator):
-    """2D discrete wavelet transform, uses a Daubechies wavelet.
+    """2D discrete wavelet transform, uses a Haar wavelet.
 
     Implements the real operator R^(n1, n2) -> R^(m)
     applying the discrete wavelet transform with a Daubechies (orthogonal) wavelet.
@@ -952,10 +952,10 @@ class Wavelet(LinearOperator):
         self.device = device
         self.level = level
         self.wavelet = lambda x: pywt.wavedec2(
-            x, wavelet="db4", mode="zero", level=self.level, axes=(-2, -1)
+            x, wavelet="haar", mode="zero", level=self.level, axes=(-2, -1)
         )
         self.iwavelet = lambda x: pywt.waverec2(
-            x, wavelet="db4", mode="zero", axes=(-2, -1)
+            x, wavelet="haar", mode="zero", axes=(-2, -1)
         )
         self.slices, self.out_shape = get_slices(self.in_shape, self.wavelet)
         super().__init__(self.out_shape[0] * self.out_shape[1], n)

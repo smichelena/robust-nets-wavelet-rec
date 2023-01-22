@@ -23,7 +23,7 @@ import config  # isort:skip
 # ------ setup ----------
 device = torch.device("cuda")
 
-file_name = "grid_search_l1_fourier_"
+file_name = "grid_search_l1_wavelet_"
 save_path = os.path.join(config.RESULTS_PATH, "grid_search_l1")
 
 # ----- operators --------
@@ -119,11 +119,11 @@ if __name__ == "__main__":
         )
 
         results.loc[idx] = {
-            "noise_rel": noise_rel[idx],#.cpu().detach().numpy(),
+            "noise_rel": noise_rel[idx],
             "grid_param": grid_param,
-            "err_min": err_min,#.cpu().detach().numpy(),
+            "err_min": err_min,
             "grid": grid,
-            "err": err,#.cpu().detach().numpy(),
+            "err": err,
         }
 
         os.makedirs(save_path, exist_ok=True)
